@@ -30,7 +30,7 @@ The following snippet demonstrates how reactive functions act as the glue betwee
 
 ```javascript
 syntez({
-    log: () => JSON.stringify(syntez.keys()),
+    console: () => JSON.stringify(syntez.keys()),
     html: {
         lang: 'ua',
         head: [
