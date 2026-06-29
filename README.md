@@ -2,7 +2,6 @@
 
 ### Synchronizing Theses
 
-A lightweight, dependency-free framework for data-driven systems. Syntez provides a unified approach to managing application state, host-level entities, and their dynamic projections.
 Syntez is a lightweight, dependency-free framework for data-driven systems. It focuses on the controlled synthesis of application logic and the precise synchronization of internal state (theses) across defined host projections.
 
 ### Key Concepts
