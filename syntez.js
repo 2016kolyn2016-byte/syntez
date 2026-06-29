@@ -28,8 +28,8 @@ var syntez = (function () {
 
     function syntez(data) {
         for (var k in data) if (Object.hasOwnProperty.call(data, k)) switch(k) {
-            case'log':
-                log(data.log, data);
+            case'console':
+                consoleSet(data.console, data);
                 break;
             case'html': {
                 var h = data.html;
@@ -94,17 +94,17 @@ var syntez = (function () {
     });
 
 
-    function log(data, ctx) {
+    function consoleSet(data, ctx) {
         if (data instanceof Function) {
-            function Log() {
+            function set() {
                 var oldWtr = wtr;
-                wtr = Log;
-                Log.gen = gen;
-                try { log(data.call(ctx), ctx) }
+                wtr = set;
+                set.gen = gen;
+                try { consoleSet(data.call(ctx), ctx) }
                 finally { wtr = oldWtr }
             }
-            Log.dps = [];
-            Log()
+            set.dps = [];
+            set()
         } else if (data !== undefined) {
             // console.clear();
             console[data instanceof Error ? 'error' : 'dir'](data)
