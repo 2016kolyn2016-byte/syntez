@@ -1,34 +1,46 @@
-# syntez
-A framework for declarative programming. Build applications as a hierarchy of interdependent objects.
+# Syntez.js
 
-Your application is synthesized into a single self-updating graph using built-in JavaScript capabilities.
-There are no artificial reactivity layers. Instead, reactivity emerges implicitly through object property definitions—implemented as functions—that are recalculated whenever the results of calls within those functions change.
+A lightweight, dependency-free framework for data-driven systems. Syntez provides a unified approach to managing application state, host-level entities, and dynamic interfaces.
 
-Key concepts:
- - Implicit graph construction: a dependency map is generated automatically when an object method is called; methods are pure functions that must return the value of the corresponding property—essentially, every method acts as a getter.
- - Built-in mutability: directly modifying a root property triggers a synchronous, cascading update across all dependent branches.
- - Seamless integration: a unified architecture that combines local state, UI components, and server data into a single object hierarchy.
+### Key Concepts
 
+* **Unified Data Model:** Treats JS objects and primitive types as the primary building blocks for both logic and structure.
+* **Declarative Definitions:** Define system states and UI structures using plain JavaScript object literals, where functions serve as reactive values.
+* **Automatic Reactivity:** State and related entities remain in sync via a lightweight dependency tracking mechanism.
+* **Minimal Footprint:** No virtual DOM, no build tools, no external dependencies. Pure JavaScript.
 
-Usage Examples
+### Usage Guidelines
 
-<script src="/syntez.js">
-<script>
-	syntez({
-		html: {
-			head: [{tag: 'meta', charset: 'utf-8'}],
-			body: [
-				{tag: 'header', body: 'Header'},
-				{tag: 'main', body: () => {
-					var name = syntez.in('Anonim');
-					return [
-						name,
-						{data: () => name.data()}
-					]
-				}},
-				{tag: 'aside', body: 1},
-				{tag: 'footer', body: {tag: 'span', data: 2}}
-			]
-		}
-	})
-</script>
+**Note:** Syntez is designed to be initialized **once**. The application structure and dynamics should be described using functions that react to data changes. Avoid calling `syntez()` repeatedly; instead, encapsulate your logic and state within the initial definition, allowing the framework to handle updates reactively.
+
+### Live Example
+
+The following snippet demonstrates how reactive functions act as the glue between data and the interface:
+
+```javascript
+syntez({
+    console: () => JSON.stringify(syntez.keys()),
+    html: {
+        lang: 'ua',
+        head: [
+            {tag: 'meta', charset: 'utf-8'},
+            {tag: 'title', val: 'Syntez.js'},
+            {tag: 'style', val: `
+                html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+                body { overflow-y: scroll; }
+            `}
+        ],
+        body: [
+            {tag: 'header', val: 'Syntez Header'},
+            {tag: 'main', val: () => {
+                var name = syntez.control('Anonim');
+                return [ 
+                    {tag: 'input', val: name}, 
+                    {val: () => 'Hello, ' + name.val() + '!'} 
+                ]
+            }},
+            {tag: 'aside', val: 'Syntez Aside'},
+            {tag: 'footer', val: 'Syntez Footer'}
+        ]
+    }
+});
