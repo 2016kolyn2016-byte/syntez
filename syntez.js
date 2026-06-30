@@ -76,22 +76,32 @@ var syntez = (function () {
         return(syntez.keys = keys)()
     };
 
-    function Control(data) {
-        if (this === syntez) return new Control(data);
-        if (['number', 'string'].includes(typeof data)) this.data = data;
-        else if (data instanceof Object) Object.assign(this, data);
-        (this.val = function val() {
-            var wts = val.wts, i = wts ? wts.length : 0;
-            if (wts) while(i--) if (wts[i] === wtr) break;
-            if (i < 0) { wts[wts.length] = wtr; wtr.dps[wtr.dps.length] = val }
-            return this.data
-        }).wts = []
+    syntez.var = function(def) {
+        function VAR(data) {
+            if (arguments.length) {
+                VAR.val = data;
+                supply(VAR)
+            } else {
+                var wts = VAR.wts, i = wts ? wts.length : 0;
+                if (wts) while(i--) if (wts[i] === wtr) break;
+                if (i < 0) { wts[wts.length] = wtr; wtr.dps[wtr.dps.length] = VAR }
+                if (!Object.hasOwnProperty.call(VAR, 'val')) {
+                    if (def instanceof Function) {
+                        var oldWtr = wtr;
+                        wtr = VAR;
+                        VAR.gen = gen;
+                        try { def() }
+                        finally { wtr = oldWtr }
+                    } else VAR.val = def
+                }
+                return VAR.val
+            }
+            return VAR.val
+        }
+        VAR.wts = [];
+        VAR.dps = [];
+        return VAR
     }
-    Object.assign((syntez.control = Control).prototype, {
-        data: null,
-        masc: null,
-        vldt: null
-    });
 
 
     function consoleSet(data, ctx) {
@@ -127,6 +137,47 @@ var syntez = (function () {
         }
     }
 
+    function htmlSrc(el, val) {
+        if (val instanceof Function) {
+            function htmlSrcUp() {
+                var oldWtr = wtr;
+                wtr = htmlSrcUp;
+                htmlSrcUp.gen = gen;
+                try { htmlSrc(el, val()) }
+                finally { wtr = oldWtr }
+            }
+            htmlSrcUp.dps = [];
+            htmlSrcUp()
+        } else {
+            el.src = val
+        }
+    }
+
+    function htmlValue(el, val) {
+        if (val instanceof Function) {
+            var up = true;
+            function htmlValueUp() {
+                if (up) {
+                    var oldWtr = wtr;
+                    wtr = htmlValueUp;
+                    htmlValueUp.gen = gen;
+                    try { htmlValue(el, val()) }
+                    finally { wtr = oldWtr }
+                }
+            }
+            htmlValueUp.dps = [];
+            htmlValueUp();
+            if (val.name === 'VAR') el.oninput = function() {
+                var wts = val.wts, i = wts.length;
+                up = false;
+                val(this.value);
+                up = true
+            }
+        } else {
+            el.value = val
+        }
+    }
+
     function html(data, $, tag) {
         if (data instanceof Function) {
             function htmlUp() {
@@ -150,13 +201,9 @@ var syntez = (function () {
             for(var k in data) if (Object.hasOwnProperty.call(data, k)) switch(k) {
                 case'tag': break;
                 case'val': {
-                    if (data.val instanceof Control) {
-                        el.oninput = function() {
-                            data.val.data = this.value;
-                            supply(data.val.val)
-                        };
-                        el.setAttribute('value', data.val.data)
-                    } else el.appendChild(html(data.val, el, tag));
+                    if ('value' in el) htmlValue(el, data.val);
+                    else if ('src' in el) htmlSrc(el, data.val);
+                    else el.appendChild(html(data.val, el, tag));
                     break
                 }
                 default: htmlAttr(el, k, data[k])
