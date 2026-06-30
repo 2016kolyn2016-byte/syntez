@@ -7,7 +7,7 @@ var syntez = (function () {
             var i = wts.length, wtr;
             while(i--) {
                 wtr = wts[i];
-                wtr()
+                wtr(src)
             }
             for (i = wts.length - 1; i >= 0; i--) {
                 if (wts[i].gen !== gen) {
@@ -56,7 +56,10 @@ var syntez = (function () {
         function keys() {
             var wts = keys.wts, i = wts ? wts.length : 0;
             if (wts) while(i--) if (wts[i] === wtr) break;
-            if (i < 0) { wts[wts.length] = wtr; wtr.dps[wtr.dps.length] = keys }
+            if (wtr && i < 0) {
+                wts[wts.length] = wtr;
+                wtr.dps[wtr.dps.length] = keys
+            }
             return k
         }
         keys.wts = [];
@@ -84,7 +87,10 @@ var syntez = (function () {
             } else {
                 var wts = VAR.wts, i = wts ? wts.length : 0;
                 if (wts) while(i--) if (wts[i] === wtr) break;
-                if (i < 0) { wts[wts.length] = wtr; wtr.dps[wtr.dps.length] = VAR }
+                if (wtr && i < 0) {
+                    wts[wts.length] = wtr;
+                    wtr.dps[wtr.dps.length] = VAR
+                }
                 if (!Object.hasOwnProperty.call(VAR, 'val')) {
                     if (def instanceof Function) {
                         var oldWtr = wtr;
@@ -102,6 +108,42 @@ var syntez = (function () {
         VAR.dps = [];
         return VAR
     }
+
+    syntez.alt = function Alt() {
+        if (arguments.length < 2) return new Error();
+        var val;
+        function alt(source) {
+            if (alt.vals) {
+                var oldWtr = wtr;
+                wtr = alt;
+                alt.gen = gen;
+                try {
+                    for (var i = 0, vals = alt.vals, l = vals.length; i < l; i++) {
+                        if (vals[i] instanceof Function) {
+                            var t = vals[i]();
+                            if (t || t === 0) val = t
+                        } else val = vals[i]
+                    }
+                } finally { wtr = oldWtr }
+                delete alt.vals
+            }
+            if (source) {
+                val = source();
+                supply(alt)
+            }
+            var wts = alt.wts, i = wts ? wts.length : 0;
+            if (wts) while(i--) if (wts[i] === wtr) break;
+            if (wtr && i < 0) {
+                wts[wts.length] = wtr;
+                wtr.dps[wtr.dps.length] = alt
+            }
+            return val
+        }
+        alt.wts = [];
+        alt.dps = [];
+        alt.vals = arguments;
+        return alt
+    };
 
 
     function consoleSet(data, ctx) {
