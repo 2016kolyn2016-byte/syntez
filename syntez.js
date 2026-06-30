@@ -27,6 +27,7 @@ var syntez = (function () {
 
 
     function syntez(data) {
+console.log(data);
         for (var k in data) if (Object.hasOwnProperty.call(data, k)) switch(k) {
             case'console':
                 consoleSet(data.console, data);
