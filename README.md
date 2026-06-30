@@ -42,16 +42,19 @@ syntez({
             `}
         ],
         body: [
-            {tag: 'header', val: 'Syntez Header'},
-            {tag: 'main', val: () => {
-                var name = syntez.control('Anonim');
-                return [ 
-                    {tag: 'input', val: name}, 
-                    {val: () => 'Hello, ' + name.val() + '!'} 
-                ]
-            }},
-            {tag: 'aside', val: 'Syntez Aside'},
+            {tag: 'header', val: {tag:'h1', val: 'Synchronizing Theses'}},
+            {tag: 'main', val: [
+                {tag: 'h2', val: 'Name'},
+                {tag: 'div', val: () => {
+                    var name = syntez.var('Anonim');
+                    return [
+                        {tag: 'input', val: name},
+                        {val: () => 'Hello, ' + name() + '!'}
+                    ]
+                }}
+            ]},
+            {tag: 'aside', val: 'Syntez Aside', style: 'margin-top:32px'},
             {tag: 'footer', val: 'Syntez Footer'}
         ]
     }
-});
+})
