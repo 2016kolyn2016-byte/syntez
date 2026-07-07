@@ -1,13 +1,19 @@
 var syntez = (function () {
     var gen = 0, wtr = null;
+    var activeSrc = null;
+
     function supply(src) {
+        if (activeSrc === src) return
+        var oldActive = activeSrc;
+        activeSrc = src;
+
         var wts = src.wts;
         if (src.wts && src.wts.length) {
             delete src.wts;
-            var i = wts.length, wtr;
+            var i = wts.length, wtrLocal;
             while(i--) {
-                wtr = wts[i];
-                wtr(src)
+                wtrLocal = wts[i];
+                wtrLocal(src)
             }
             for (i = wts.length - 1; i >= 0; i--) {
                 if (wts[i].gen !== gen) {
@@ -23,6 +29,7 @@ var syntez = (function () {
             }
             src.wts = wts
         }
+        activeSrc = oldActive
     }
 
 
@@ -82,6 +89,7 @@ var syntez = (function () {
     syntez.var = function(def) {
         function VAR(data) {
             if (arguments.length) {
+                if (VAR.val === data) return VAR.val
                 VAR.val = data;
                 supply(VAR)
             } else {
@@ -96,7 +104,9 @@ var syntez = (function () {
                         var oldWtr = wtr;
                         wtr = VAR;
                         VAR.gen = gen;
-                        try { def() }
+                        try {
+                            VAR.val = def()
+                        }
                         finally { wtr = oldWtr }
                     } else VAR.val = def
                 }
@@ -104,16 +114,22 @@ var syntez = (function () {
             }
             return VAR.val
         }
+        VAR.isVar = true;
         VAR.wts = [];
         VAR.dps = [];
+        if (def && def.isAlt) def.target = VAR
         return VAR
-    }
+    };
 
     syntez.alt = function Alt() {
-        if (arguments.length < 2) return new Error();
+        if (arguments.length < 2) return new Error()
         var val;
+        var args = Array.prototype.slice.call(arguments);
         function alt(source) {
+            if (alt.computing) return val
+            
             if (alt.vals) {
+                alt.computing = true;
                 var oldWtr = wtr;
                 wtr = alt;
                 alt.gen = gen;
@@ -121,14 +137,34 @@ var syntez = (function () {
                     for (var i = 0, vals = alt.vals, l = vals.length; i < l; i++) {
                         if (vals[i] instanceof Function) {
                             var t = vals[i]();
-                            if (t || t === 0) val = t
-                        } else val = vals[i]
+                            if (t || t === 0) { val = t; break }
+                        } else {
+                            val = vals[i];
+                            break
+                        }
                     }
-                } finally { wtr = oldWtr }
+                } finally {
+                    wtr = oldWtr;
+                    alt.computing = false
+                }
                 delete alt.vals
             }
             if (source) {
-                val = source();
+                alt.computing = true;
+                var oldWtr = wtr;
+                wtr = alt;
+                try {
+                    for (var i = 0; i < args.length; i++) {
+                        if (args[i] instanceof Function) {
+                            var t = args[i]();
+                            if (t || t === 0) { val = t; break }
+                        }
+                    }
+                } finally {
+                    wtr = oldWtr;
+                    alt.computing = false
+                }
+                if (alt.target) alt.target.val = val;
                 supply(alt)
             }
             var wts = alt.wts, i = wts ? wts.length : 0;
@@ -139,9 +175,11 @@ var syntez = (function () {
             }
             return val
         }
+        alt.isAlt = true;
+        alt.computing = false;
         alt.wts = [];
         alt.dps = [];
-        alt.vals = arguments;
+        alt.vals = args;
         return alt
     };
 
@@ -158,7 +196,7 @@ var syntez = (function () {
             set.dps = [];
             set()
         } else if (data !== undefined) {
-            // console.clear();
+            console.clear();
             console[data instanceof Error ? 'error' : 'dir'](data)
         }
     }
@@ -209,14 +247,15 @@ var syntez = (function () {
             }
             htmlValueUp.dps = [];
             htmlValueUp();
-            if (val.name === 'VAR') el.oninput = function() {
-                var wts = val.wts, i = wts.length;
+            if (val.isVar) el.oninput = function() {
                 up = false;
-                val(this.value);
+                var v = this.value;
+                if (typeof val() === 'number' || !isNaN(v) && v !== '') v = parseFloat(v) || 0;
+                val(v);
                 up = true
             }
         } else {
-            el.value = val
+            el.value = val || val === 0 ? val : ''
         }
     }
 
