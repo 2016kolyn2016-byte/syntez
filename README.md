@@ -28,7 +28,7 @@ To manage data flow, use these conventions:
 
 The following snippet demonstrates how reactive functions act as the glue between data and the interface:
 
-```index.js
+```/web/index.js
 syn({
     console: syn.keys,
     view: [
