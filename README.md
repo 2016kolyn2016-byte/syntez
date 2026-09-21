@@ -1,189 +1,179 @@
 # Syntez.js
 
-## Declarative programming through a self-evaluating structure
+## Declarative applications as data structures
 
-Syntez.js is a declarative data runtime. An application is described once as a JavaScript object passed to `syn(...)`. The object defines the data of the application, the relationships between its values, and the system interfaces through which those values are received or emitted.
+Syntez.js is a declarative runtime for describing applications as data.
 
-Syntez is built around two ideas:
-
-1. **A declarative application structure** — the application is described as a hierarchy of named values.
-2. **Self-evaluating functors** — functions inside that structure describe derived values. They read other values and are re-evaluated automatically when the values they used change.
-
-A functor describes a value. It is not an event handler, command, callback, or effect. User functors do not open connections, subscribe to events, write files, update the DOM, or perform other side effects. Those operations belong to the runtime and its drivers.
+An application is defined once as a JavaScript structure passed to `syn(...)`. This structure contains system inputs, derived values, and named outputs. The runtime evaluates the structure, tracks its dependencies, and updates the corresponding outputs whenever input values change.
 
 ```js
-syn({
-    input: syn.keys,
+syn((function () {
+    function status() {
+        return [
+            'Location: ' + syn.location(),
+            'Keys: ' + JSON.stringify(syn.keys())
+        ].join('\n')
+    }
 
-    value: () => input(),
+    return {
+        console: status,
 
-    message: () => `Current input: ${value()}`,
-
-    console: () => message()
-})
+        view: [
+            { b: 0x777777ff, c: 0x00aaffff, y: 0 },
+            [status]
+        ]
+    }
+})())
 ```
 
-The user describes the values and their dependencies. The runtime determines when a value must be evaluated and where the resulting data must be sent.
+The user describes values and relationships between them. The runtime handles evaluation and communication with the surrounding environment.
 
-## The application is one declaration
+## Core concept
 
-The user-facing application is written in `index.js` and is initialized with one call to `syn(...)`:
+Syntez treats an application as a declarative hierarchy of values.
+
+A value may be:
+
+- a constant;
+- a system input;
+- a nested object;
+- an array;
+- a self-evaluating functor.
+
+A functor is an ordinary JavaScript function used as a value. It reads other values and returns a result:
+
+```js
+function status() {
+    return 'Location: ' + syn.location()
+}
+```
+
+When the runtime evaluates `status`, every system input read by the function becomes its dependency. If one of those inputs changes, the runtime evaluates `status` again and updates every output that uses its result.
+
+The functor does not know:
+
+- what caused the recalculation;
+- how many times it will be evaluated;
+- where its result will be delivered;
+- whether the input is synchronous or asynchronous.
+
+It only describes the value that must exist.
+
+## Inputs and outputs
+
+System inputs are provided by the runtime through `syn.X()` calls. In the browser runtime, available inputs include:
+
+- `syn.keys()`
+- `syn.mouse()`
+- `syn.location()`
+- `syn.email(...)`
+
+Calling an input reads its current value. The runtime updates that value when the corresponding external source changes.
+
+Output drivers are selected by property names in the application structure. The current browser runtime provides:
+
+- `console`
+- `view`
+
+Other runtimes may provide outputs for files, APIs, remote systems, serial devices, embedded hardware, and other environments.
 
 ```js
 syn({
-    console: syn.keys,
+    console: function () {
+        return 'Location: ' + syn.location()
+    },
+
     view: [
-        { b: 0x777777ff, c: 0x00aaffff, y: 0 },
-        [{ b: 0x555555ff, c: 0x00aaffff }, 'Header'],
-        ['Body'],
-        [{ b: 0x555555ff, c: 0x00aaffff }, 'Footer']
+        'Current keys: ',
+        function () {
+            return JSON.stringify(syn.keys())
+        }
     ]
 })
 ```
 
-The object may contain:
+The same value can be sent to several outputs. The value itself does not contain output-specific logic. Its destination is determined by the structure in which it is declared.
 
-- values supplied by system inputs;
-- constants;
-- nested objects and arrays;
-- functors that derive new values from existing values;
-- named output properties understood by the runtime.
+## No event handlers or effects
 
-The hierarchy is part of the application model. Names and positions are not merely implementation details: they describe where data belongs and which system driver should interpret it.
+User code describes values, not actions.
 
-## Inputs and outputs
+A user functor does not:
 
-External systems are represented by system inputs exposed through `syn.X()` or the corresponding runtime property. A keyboard event, URL change, completed request, file update, or device signal is simply a new value supplied by a system input.
+- subscribe to events;
+- open or close connections;
+- read or write files;
+- update the screen;
+- send requests;
+- trigger recalculation;
+- manage cleanup or lifecycle.
 
-Outputs are selected declaratively by the name of a property. The runtime knows how to interpret that property and how to deliver its value to the corresponding environment.
+These operations belong to system drivers and the runtime.
 
-For example, the web runtime currently provides a `view` driver and a `console` driver. Other drivers can be provided by the runtime for other destinations, such as files, services, devices, or remote systems.
+An external event is represented as a change of a system input. A completed request, a keyboard event, a file update, a network message, or a device signal all have the same meaning for user code:
 
-The same derived value does not need to know where it will be used:
-
-```js
-syn({
-    source: syn.someInput(),
-
-    result: () => transform(source()),
-
-    view: () => result(),
-    console: () => result()
-})
+```text
+a system value has changed
 ```
 
-The user writes the data transformation once. The output driver is responsible for materializing it in its own environment.
+The dependent functors are then evaluated again.
 
-> Driver names, available system inputs, and the structure expected by each driver are part of the Syntez API and are documented separately.
+Asynchronous processing is therefore not a separate programming model. It is another way for a system input to receive a new value.
 
-## Functors and dependencies
+## Dependency evaluation
 
-A functor is a function used as a declarative value:
+Dependencies are discovered automatically during evaluation.
 
-```js
-syn({
-    first: syn.someInput(),
-    second: syn.anotherInput(),
-
-    combined: () => `${first()} ${second()}`
-})
+```text
+system input → user functor → derived value → output driver
 ```
 
-When `combined` is evaluated, the runtime records the system values it reads. If one of those values changes, `combined` is evaluated again. If a later evaluation reads a different set of values, obsolete dependencies are removed automatically.
+The user does not declare subscriptions or dependency lists. If a functor reads a different set of inputs during a later evaluation, dependencies that are no longer used are removed automatically.
 
-User code does not need to:
+The dependency graph is formed from system inputs to derived values and outputs. User code only reads values and returns values; it does not create reverse dependencies or perform side effects.
 
-- register dependencies;
-- call an update method;
-- trigger a redraw;
-- subscribe or unsubscribe;
-- manage cleanup for recalculation;
-- know what caused a recalculation.
+## One application declaration
 
-The runtime owns the dependency graph. User code only describes values.
+A Syntez application is initialized once with `syn(...)`.
 
-## Asynchronous values
-
-An asynchronous operation is represented by a system input that receives a new value when the operation progresses or completes. From the user’s perspective, this is no different from a keyboard input or any other changing source.
-
-A functor can therefore use an asynchronous value in exactly the same way as any other value:
-
-```js
-syn({
-    response: syn.remoteData(),
-
-    text: () => response() && response().text,
-
-    view: () => text()
-})
-```
-
-The runtime and the driver handle the asynchronous operation. The user declaration only describes what should be derived from the current value.
-
-## No verbs in the application model
-
-Syntez applications describe a world of values and relationships, not a sequence of commands.
-
-User declarations do not contain operations such as:
-
-- opening or closing connections;
-- subscribing to events;
-- writing to files;
-- updating a screen manually;
-- sending requests;
-- starting or stopping a lifecycle;
-- calling a rerender function.
-
-These are runtime responsibilities. A driver may perform such work internally, but it is not exposed as the user’s programming model.
-
-This separation keeps application code focused on the data it describes and the relationships between that data.
-
-## Runtime and drivers
-
-`web/syntez.js` is currently the browser runtime. It contains the dependency engine, the browser inputs, and the web output driver used by the example application. The browser is currently the primary environment because it provides a convenient way to develop and inspect the system.
-
-The runtime is intended to be replaceable. Other environments may provide their own implementations of the same underlying model and their own input/output drivers. Possible environments include server processes, files, remote systems, serial devices, and embedded hardware.
-
-A custom driver may be implemented when a required system interface is not yet available. This is an extension mechanism, not the normal way an application is written.
-
-Internal calls such as `syn.tez(function () { ... })` belong to the runtime. They are implementation mechanisms of the dependency engine and are not part of the normal user-facing application API.
-
-## Current web usage
-
-The repository currently contains a minimal browser setup:
+The application structure is written by the user in `index.js`. Runtime files, dependency tracking, system inputs, and output drivers are provided by the environment.
 
 ```html
 <script src="/syntez.js"></script>
 <script src="/index.js"></script>
 ```
 
-`index.js` contains the application declaration. `syntez.js` and the other files in `web/` provide the runtime and presentation layer.
+The browser implementation is currently the primary runtime because it provides a convenient environment for development and inspection. The same declarative model can be implemented for other environments without changing the programming model.
 
-A minimal application can be written as:
+## Runtime and custom drivers
 
-```js
-syn({
-    console: () => `Year: ${syn.year()}`,
-    view: ['p', () => `Year: ${syn.year()}`]
-})
-```
+`web/syntez.js` is the current browser runtime. It contains:
 
-The exact values and drivers available depend on the runtime in which the declaration is executed.
+- the dependency engine;
+- browser input drivers;
+- browser output drivers;
+- environment-specific runtime code.
+
+Internal mechanisms such as `syn.tez(...)` belong to the runtime and are not part of the normal application API.
+
+A custom driver may be implemented when the runtime does not yet provide a required input or output. This is an extension mechanism. Normal application code should use documented system drivers and declarative values.
 
 ## Design principles
 
-- **One application declaration.** The application is initialized once with `syn(...)`.
-- **JavaScript as the user language.** The declaration uses ordinary JavaScript objects, arrays, values, and functions.
-- **Values instead of procedures.** User functors describe derived values and do not perform effects.
-- **Automatic evaluation.** The runtime evaluates dependent functors when their inputs change.
-- **Driver-defined interpretation.** Property names identify the system interfaces that consume or provide data.
-- **No user-managed lifecycle.** Connections, subscriptions, output updates, and cleanup are runtime concerns.
-- **Environment independence.** The declaration describes the application; the runtime determines how it is connected to its environment.
-- **Minimal vocabulary.** The user should learn the application structure, the available `syn.X()` inputs, and the documented output properties—not a separate programming model for every kind of input or output.
+- **One declaration** — the application is described once through `syn(...)`.
+- **Data instead of procedures** — the application consists of values and relationships, not commands.
+- **Ordinary JavaScript** — user code uses JavaScript objects, arrays, functions, closures, and modules.
+- **Self-evaluating functors** — functions describe derived values and are evaluated automatically when their inputs change.
+- **Uniform inputs** — keyboard, network, files, URLs, timers, and devices are represented as changing system values.
+- **Uniform outputs** — screen, console, files, APIs, and devices receive values through named output drivers.
+- **No user-managed lifecycle** — subscriptions, connections, asynchronous work, and cleanup are runtime responsibilities.
+- **Environment-independent model** — the application describes a world of values; the runtime connects it to a particular environment.
+- **Minimal user vocabulary** — the user needs to understand the declaration structure, system inputs, functors, and documented output properties.
 
 ## Status
 
-Syntez.js is an experimental project. The current implementation focuses on the web runtime and on validating the declarative data model. The public API, available drivers, and runtime architecture may change as the system develops.
+Syntez.js is an experimental project.
 
-The central goal is to make an application expressible as a clear declarative structure whose values continuously describe the state of its world, while the runtime handles evaluation and communication with the surrounding environment.
-````
+The current implementation focuses on the browser runtime and on validating the declarative data model.
+
+The goal of Syntez is to make application programming consist primarily of describing a coherent structure of values and dependencies, while the runtime handles evaluation and interaction with the surrounding world.
