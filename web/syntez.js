@@ -122,6 +122,17 @@ syn.email = function email(val) {
     if (arguments.length) email(val);
     return email
 };
+syn.req = function req(uri, data) {
+    return function res() {
+        if (!res.act) {
+            res.act = syn.tez(new Error('Loading'));
+            fetch(uri, data).then(function(data) { if (data.ok) return data.text(); throw new Error(`HTTP ${data.status}`) })
+            .then(function(data) { res.act(data) })
+            .catch((err) => { res.act(err) })
+        }
+        return res.act()
+    }
+};
 
 // Console
 syn.tez(function() {
