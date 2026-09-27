@@ -53,3 +53,7 @@ body [data-v]>* {
     display: table-row;
     height: 0;
 }
+
+body [data-v]>s-g:last-of-type {
+	height: 100%;
+}
