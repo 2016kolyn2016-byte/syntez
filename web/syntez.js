@@ -30,7 +30,7 @@ Object.assign(Number.prototype, {
 
 Object.assign(String.prototype, {
 	'~String': function(y) { var m = '~ ' + y; return this[m] ? this[m]() : new Error('Unknown typer String' + m) },
-	'~ spin': function() {
+	'~ syntez': function() {
 		for (var r = new Ctx(null), a = null, x = null, o = null, y = null, c = null, t = null, i = 0, l = this.length; i <= l; i++) {
 			if ((c = this[i]) === undefined) {
 				if (x === null) x = y; else { x[x.sz + 'o'] = y; x[x.sz++] = o }
@@ -325,8 +325,8 @@ Object.assign(Array.prototype, {
 
 // Init
 	var app = null;
-	fetch('index.spin').then(data => data.text()).then(data => {
-		app = data['~']('spin');
+	fetch('index.syntez').then(data => data.text()).then(data => {
+		app = data['~']('syntez');
 		tez(function() { document.body.innerHTML = '<div></div>'; document.body.firstChild['='](app['/']('view')) });
 		tez(function() { console['='](app['/']('console')) })
 	})
