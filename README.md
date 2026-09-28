@@ -1,43 +1,31 @@
-# Syntez.js
+# Syntez
 
-## Declarative applications as values
+## Declarative applications as a virtual machine
 
-Syntez.js is an experimental runtime for describing applications as declarative structures of values.
+Syntez is an experimental framework for describing applications as declarative structures of values and dependencies. Applications are written in the `.syntez` language and executed by a language-agnostic virtual machine.
 
-A Syntez application is declared once with `syn(...)`. The declaration contains:
+A Syntez application declares **what values must exist and how they are determined**. The virtual machine evaluates these relationships and connects the resulting values to the surrounding environment. User code never has direct access to system APIs or environment state.
 
-- constant values;
-- system inputs;
-- derived values;
-- nested objects;
-- arrays;
-- output descriptions.
-
-User code describes **what values must exist and how they are determined**. The runtime evaluates these relationships and connects the resulting values to the surrounding environment.
-
-```js
-syn({
-    console: function () {
-        return [
-            'Location: ' + syn.location(),
-            'Keys: ' + JSON.stringify(syn.keys())
-        ].join('\n')
-    },
-
-    view: [
-        { b: 0x777777ff, c: 0x00aaffff, y: 0 },
-        function () {
-            return 'Current location: ' + syn.location()
-        }
-    ]
-})
+```syntez
+console(location:);
+view(
+    y(0);
+    b(2004318207);
+    c(11206655);
+    
+    (b(255); Header);
+    Body;
+    (b(255); Footer)
+);
 ```
 
 The user does not manually subscribe to changes, trigger recalculation, update the screen, or synchronize outputs. These are runtime responsibilities.
 
 ---
 
-## The central idea
+## Architecture
+
+### The Central Idea
 
 Syntez treats an application as a declarative hierarchy of values.
 
@@ -51,18 +39,16 @@ A value can be:
 
 For example:
 
-```js
-function status() {
-    return 'Location: ' + syn.location()
-}
+```syntez
+status: location:;
 ```
 
-The function does not describe an action. It describes the value that must exist according to the current location.
+The functor does not describe an action. It describes the value that must exist according to the current location.
 
-If `syn.location()` changes, the value returned by `status` becomes different because the relationship is still valid:
+If location changes, the value returned by `status` becomes different because the relationship is still valid:
 
 ```text
-status = "Location: " + location
+status = location
 ```
 
 The user does not need to think about event handlers or subscriptions. The function is treated as a declarative rule.
@@ -79,7 +65,7 @@ Syntez applies the same idea to application structures.
 
 ---
 
-## Values, not procedures
+## Values, Not Procedures
 
 Syntez code is intended to describe values rather than a sequence of commands.
 
@@ -93,22 +79,19 @@ It does not normally:
 
 - subscribe to events;
 - trigger recalculation;
-- update the DOM;
-- write directly to files;
-- send network requests;
-- manage connections;
-- manage cleanup;
-- mutate unrelated application state.
+- update the screen;
+- make network requests;
+- manage state mutations;
+- perform side effects;
+- access system resources.
 
 For example:
 
-```js
-function greeting() {
-    return 'Hello, ' + user().name
-}
+```syntez
+greeting: 'Hello, ' + user:;
 ```
 
-This describes a value derived from `user()`.
+This describes a value derived from `user`.
 
 It does not say:
 
@@ -126,17 +109,17 @@ The runtime uses this relationship to keep the application values consistent.
 
 ---
 
-## The application is a dependency structure
+## The Application is a Dependency Structure
 
 A Syntez application can be understood as a structure like this:
 
 ```text
 system input
-      ↓
+    ↓
 user functor
-      ↓
+    ↓
 derived value
-      ↓
+    ↓
 output driver
 ```
 
@@ -144,9 +127,9 @@ For example:
 
 ```text
 keyboard state
-      ↓
+    ↓
 status()
-      ↓
+    ↓
 console
 ```
 
@@ -154,146 +137,74 @@ or:
 
 ```text
 location
-      ↓
+    ↓
 page()
-      ↓
+    ↓
 view
 ```
 
 The dependency is discovered when a functor reads a value during evaluation.
 
-```js
-function status() {
-    return [
-        'Location: ' + syn.location(),
-        'Keys: ' + JSON.stringify(syn.keys())
-    ].join('\n')
-}
-```
-
-The runtime can see that `status` depends on:
-
-- `syn.location()`;
-- `syn.keys()`.
-
-If a later evaluation reads a different set of values, the dependency structure is updated accordingly.
-
-```js
-function value() {
-    if (syn.location().indexOf('#a') !== -1) {
-        return syn.keys()
-    }
-
-    return syn.location()
-}
-```
-
-In this example, the dependencies used by `value` may change according to the current location. The user does not declare or remove subscriptions manually.
+If a later evaluation reads a different set of values, the dependency structure is updated accordingly. The user does not declare or remove subscriptions manually.
 
 ---
 
-## System inputs
+## System Inputs
 
-System inputs expose values provided by the surrounding environment.
+System inputs expose values provided by the surrounding environment through the virtual machine.
 
 The current browser runtime provides:
 
-### Keyboard input
+### Keyboard Input
 
-```js
-syn.keys()
+```syntez
+keys:
 ```
 
 Returns the current keyboard state.
 
-```js
-syn({
-    console: function () {
-        return JSON.stringify(syn.keys())
-    }
-})
-```
+### Mouse Input
 
-### Mouse input
-
-```js
-syn.mouse()
+```syntez
+mouse:
 ```
 
 Returns the current mouse-related state maintained by the browser driver.
 
-### Browser location
+### Browser Location
 
-```js
-syn.location()
+```syntez
+location:
 ```
 
 Returns the current browser location.
 
-```js
-syn({
-    console: function () {
-        return 'Current location: ' + syn.location()
-    }
-})
+```syntez
+console(location:);
 ```
 
 The value is updated when the browser location changes.
 
-### Validated email value
-
-```js
-syn.email()
-```
-
-` syn.email(...) ` creates a value intended for email input and validation.
-
-```js
-var email = syn.email()
-
-email('user@example.com')
-```
-
-The exact behavior of an input is defined by its system driver.
-
 ---
 
-## Output drivers
+## Output Drivers
 
 Outputs are selected by properties in the application declaration.
 
 The current browser runtime provides:
 
-- `console`;
-- `view`.
+- `console` — outputs to browser console;
+- `view` — renders to the DOM.
 
-```js
-syn({
-    console: function () {
-        return 'Current location: ' + syn.location()
-    },
-
-    view: [
-        'Current keys: ',
-        function () {
-            return JSON.stringify(syn.keys())
-        }
-    ]
-})
+```syntez
+console(location:);
+view(
+    'Current location: ';
+    location:
+);
 ```
 
-The same derived value can be used by several outputs:
-
-```js
-function status() {
-    return 'Location: ' + syn.location()
-}
-
-syn({
-    console: status,
-    view: [status]
-})
-```
+The same derived value can be used by several outputs.
 
 The function does not contain console-specific or view-specific logic. The surrounding declaration determines where its result is delivered.
 
@@ -301,58 +212,29 @@ This allows the same application model to use different output drivers for diffe
 
 Possible future drivers may connect values to:
 
-- files;
-- databases;
 - HTTP APIs;
 - WebSockets;
+- files;
+- databases;
+- timers;
 - remote systems;
-- serial devices;
 - embedded hardware;
 - other external environments.
 
-Such drivers are not currently implemented by the browser runtime unless explicitly provided by the application or runtime extension.
+Such drivers are not currently implemented unless explicitly provided.
 
 ---
 
-## Data and external systems
+## Data and External Systems
 
-A driver interprets ordinary JavaScript values according to the rules of its environment.
+A driver interprets Syntez values according to the rules of its environment.
 
-For example, a database driver could interpret a JavaScript structure as desired database state:
-
-```js
-syn({
-    db: function () {
-        return {
-            users: [
-                { id: 1, name: 'Alice' },
-                { id: 2, name: 'Bob' }
-            ]
-        }
-    }
-})
-```
-
-The application describes the value. The database driver is responsible for deciding how to synchronize the external database with that value.
-
-The user does not need to write low-level database operations such as:
-
-```text
-connect
-begin transaction
-insert
-update
-delete
-commit
-close
-```
-
-Those operations belong to the driver.
+For example, a database driver could interpret a Syntez structure as desired database state. The application describes the value. The database driver is responsible for deciding how to synchronize the external database with that value.
 
 This principle applies to other environments as well:
 
 ```text
-JavaScript value → system driver → external system
+Syntez value → system driver → external system
 ```
 
 A driver may interpret a value as:
@@ -369,43 +251,13 @@ The meaning depends on the driver contract.
 
 ---
 
-## Values can represent loading and errors
+## Values Can Represent Loading and Errors
 
-Syntez does not require loading states and application errors to be a separate user-facing control-flow mechanism.
+Syntez does not require loading states and application errors to be a separate control-flow mechanism.
 
 A system driver can represent them as ordinary values.
 
-For example, a request driver may return:
-
-```js
-new Error('Loading')
-```
-
-or:
-
-```js
-new Error('Connection failed')
-```
-
-A user functor can inspect the result and choose how to represent it:
-
-```js
-function requestView() {
-    var result = syn.request()
-
-    if (result instanceof Error) {
-        return {
-            message: result.message,
-            color: 'red'
-        }
-    }
-
-    return {
-        message: result,
-        color: 'black'
-    }
-}
-```
+For example, a request driver may return an error value representing a loading state or a connection failure. A user functor can inspect the result and choose how to represent it.
 
 The same error value can be:
 
@@ -418,11 +270,9 @@ The same error value can be:
 
 The application decides how an error value should appear or propagate.
 
-This is different from an unexpected JavaScript exception thrown because of a programming error. Such exceptions are runtime failures and are handled by the runtime separately from ordinary application values.
-
 ---
 
-## External actions and activation
+## External Actions and Activation
 
 Some operations should happen only after an explicit external event.
 
@@ -434,18 +284,12 @@ Conceptually:
 
 ```text
 form state
-      ↓
+    ↓
 submit activation
-      ↓
+    ↓
 submit value
-      ↓
+    ↓
 email driver
-```
-
-A future or custom driver may expose an activation primitive such as:
-
-```js
-syn.active(...)
 ```
 
 The important distinction is:
@@ -459,71 +303,61 @@ The current browser runtime does not yet provide a complete general activation A
 
 ---
 
-## One declaration
+## Security and Isolation
 
-A Syntez application is initialized with one call to `syn(...)`.
+User code in `.syntez` files is executed in a controlled virtual machine environment.
 
-```js
-syn({
-    console: function () {
-        return 'Hello'
-    },
+**Security guarantees:**
 
-    view: [
-        { b: 0x777777ff, c: 0x00aaffff },
-        'Hello'
-    ]
-})
-```
+- No direct access to browser APIs, DOM, network, or file system;
+- No access to global state or other applications' data;
+- Only sanctioned system drivers can interact with the external environment;
+- Application code cannot escape the sandbox or bypass restrictions;
+- All operations are mediated through explicit driver contracts.
 
-A typical browser page loads the runtime and then the application:
+This makes Syntez suitable for:
 
-```html
-<script src="/syntez.js"></script>
-<script src="/index.js"></script>
-```
+- untrusted user-submitted applications;
+- sandboxed multi-tenant environments;
+- embedded application scripting;
+- secure plugin systems.
 
-The application declaration contains the user-visible model. Runtime code provides:
+**Different from procedural languages:**
 
-- dependency evaluation;
-- browser input drivers;
-- browser output drivers;
-- environment integration.
+Unlike JavaScript or other general-purpose languages, Syntez code *cannot* perform arbitrary operations. The virtual machine enforces this through its architecture, not through convention or best practices.
 
 ---
 
-## `syn.tez` and custom system extensions
+## Language Independence
 
-`syn.tez(...)` is an internal low-level mechanism used to create reactive system values and implement drivers.
+The Syntez language specification is independent of any programming language.
 
-It is not intended to be part of normal application code.
+A single `.syntez` file can be executed by:
 
-A system-driver author may use it to connect an external source to the Syntez value model:
+- JavaScript/Browser implementation (current);
+- C++ implementation;
+- PHP implementation;
+- Python implementation;
+- Go implementation;
+- Rust implementation;
+- Or any other language with a Syntez interpreter.
 
-```js
-function customInput() {
-    var value = syn.tez(null)
+Each implementation:
 
-    // External environment updates the value:
-    // value(newValue)
+- Parses the same `.syntez` syntax;
+- Evaluates the same dependency model;
+- Implements the same system drivers;
+- Produces consistent results across platforms.
 
-    return value
-}
-```
-
-Normal application code should use documented system inputs and outputs instead of calling `syn.tez(...)` directly.
-
-The purpose of this separation is to keep environment-specific mechanisms inside drivers while application code remains focused on values and relationships.
+This makes applications portable across environments and allows developers to choose the best runtime for their use case.
 
 ---
 
-## Why this model is useful
+## Why This Model is Useful
 
-### Local definition of values
+### Local Definition of Values
 
-A derived value is described at a specific declaration site.
-
-There is no normal public operation for arbitrary code to update that derived value from somewhere else. Its result is determined by:
+A derived value is described at a specific declaration site. There is no public operation for arbitrary code to update that derived value from somewhere else. Its result is determined by:
 
 - the functor that describes it;
 - the values read by that functor;
@@ -531,19 +365,9 @@ There is no normal public operation for arbitrary code to update that derived va
 
 This makes the origin of a value easier to find and understand.
 
-### Fewer hidden mutations
+### Fewer Hidden Mutations
 
-In an ordinary mutable application, a value may be changed from many unrelated places:
-
-```js
-state.value = ...
-store.dispatch(...)
-eventBus.emit(...)
-socket.on(...)
-setTimeout(...)
-```
-
-This can make it difficult to determine why a value has a particular state.
+In an ordinary mutable application, a value may be changed from many unrelated places. This can make it difficult to determine why a value has a particular state.
 
 In Syntez, the intended model is:
 
@@ -553,7 +377,7 @@ value = declaration(inputs)
 
 A value changes because its declared inputs change or because a system driver provides a new value.
 
-### Traceable data flow
+### Traceable Data Flow
 
 A value can be followed through the application:
 
@@ -572,7 +396,7 @@ This can make it easier to:
 - audit data flow;
 - identify which external drivers are involved.
 
-### System complexity belongs in drivers
+### System Complexity Belongs in Drivers
 
 Application code should not reimplement the same low-level mechanisms repeatedly.
 
@@ -590,42 +414,19 @@ Drivers can provide reusable implementations for:
 
 The application describes the required values. The runtime and drivers implement the system operations needed to provide or consume those values.
 
----
+### Security and Portability
 
-## Purity and JavaScript limitations
+User code is sandboxed and cannot access the environment directly. Applications are language-agnostic and can run on any platform with a Syntez interpreter. This enables:
 
-The Syntez model assumes that user functors describe values and avoid unrelated side effects.
-
-However, the current implementation uses ordinary JavaScript functions. JavaScript functions can still perform arbitrary operations:
-
-```js
-function unsafe() {
-    window.someValue = 123
-    document.cookie = '...'
-    fetch('/somewhere')
-    return 'value'
-}
-```
-
-The current JavaScript runtime cannot prevent this automatically.
-
-Therefore, the current project provides a declarative programming model and a convention for writing applications, but it is not a security sandbox.
-
-To preserve the intended model, user functors should:
-
-- read values;
-- calculate values;
-- return values;
-- avoid mutating shared objects;
-- avoid direct access to browser APIs;
-- avoid direct network, file, or database operations;
-- use system drivers for communication with the environment.
-
-A future specialized language could enforce these rules more strictly by replacing arbitrary JavaScript functions with restricted formulas. That language is not part of the current project.
+- safe execution of untrusted code;
+- true portability across web, server, mobile, and desktop;
+- multi-tenant application hosting.
 
 ---
 
-## Current browser implementation
+## Current Implementation
+
+### Browser Runtime
 
 The current implementation is an experimental browser runtime located in:
 
@@ -636,18 +437,24 @@ web/syntez.js
 The example application is located in:
 
 ```text
-web/index.js
+web/index.syntez
 ```
+
+### Language Parser
+
+The `.syntez` language is parsed by the `String.prototype['~ syntez']` function in `syntez.js`. The parser converts the text representation into an abstract syntax tree and evaluates it according to the Syntez model.
+
+### Browser-Specific Features
 
 The browser runtime currently demonstrates:
 
 - declarative application initialization;
 - dependency discovery during evaluation;
-- changing browser inputs;
-- derived values;
+- reactive system inputs (keyboard, mouse, location);
+- derived values and recalculation;
 - console output;
-- declarative view output;
-- custom reactive values through the internal `syn.tez(...)` mechanism.
+- DOM rendering and layout;
+- CSS-based styling through declarative properties.
 
 The current implementation is intentionally small and focused on validating the core model.
 
@@ -655,58 +462,59 @@ It is not yet a complete production framework.
 
 ---
 
-## Current limitations
+## Current Limitations
 
 The current project is experimental.
 
 The following areas are not yet mature or fully implemented:
 
+- formal `.syntez` language grammar and specification;
 - a complete set of system input drivers;
 - a complete set of output drivers;
+- HTTP, WebSocket, timer, and file drivers;
 - general request and database drivers;
 - a general activation API;
 - production-grade error reporting;
 - resource cleanup for all possible drivers;
 - comprehensive testing;
 - development tools and dependency inspection;
-- performance guarantees for large applications;
-- a formal driver specification;
-- a separate secure formula language.
+- performance optimization and guarantees for large applications;
+- reference implementations in languages other than JavaScript;
+- formal driver specification and contract model.
 
 These limitations concern the current implementation, not the general direction of the model.
 
-The core purpose of the project is to explore whether application programming can be expressed primarily as a declarative structure of values and dependencies, with system-specific behavior implemented once inside the runtime and its drivers.
-
 ---
 
-## Design principles
+## Design Principles
 
-- **One application declaration** — the application is described through one `syn(...)` structure.
+- **Declarative value model** — applications are described as structures of values and dependencies, not as sequences of commands.
+- **One application declaration** — the application is described through one top-level structure.
 - **Values instead of procedures** — user code describes values and relationships rather than event-handling procedures.
-- **Functions as declarative rules** — a function in the application structure describes a derived value.
 - **Automatic dependency discovery** — dependencies are discovered from the values read during evaluation.
-- **No user-managed subscriptions** — users do not manually subscribe or unsubscribe from ordinary system inputs.
+- **No user-managed subscriptions** — users do not manually subscribe or unsubscribe from system inputs.
 - **No user-managed recalculation** — users do not manually trigger updates of dependent values.
 - **System drivers own external operations** — input, output, I/O, communication, and environment integration belong to drivers.
 - **Errors can be values** — loading and application-level failures can be represented and processed as ordinary values.
 - **Explicit external activation** — operations that must happen after an external action should use an activation-oriented system driver.
 - **Local value definition** — a derived value is determined by its declaration and its dependencies rather than arbitrary writes from unrelated code.
-- **Ordinary JavaScript values** — objects, arrays, strings, numbers, functions, and other JavaScript values can participate in the application structure.
+- **Isolated execution** — user code runs in a sandbox and cannot access the environment directly.
+- **Language independence** — the same `.syntez` specification can be implemented in any programming language.
 - **Minimal user vocabulary** — application authors should primarily need to understand values, functors, system inputs, output properties, and available drivers.
 
 ---
 
 ## Status
 
-Syntez.js is an experimental project.
+Syntez is an experimental project exploring whether application programming can be expressed primarily as:
 
-The current implementation focuses on validating a declarative application model in the browser:
+1. A declarative structure of values and dependencies;
+2. A language-agnostic virtual machine that isolates user code;
+3. System-specific behavior implemented through extensible drivers.
 
-```text
-application structure
-    → system inputs
-    → derived values
-    → output drivers
-```
+The long-term goal is to make it possible to:
 
-The long-term goal is to make application programming consist primarily of describing a coherent structure of values and dependencies, while the runtime and system drivers handle communication with the surrounding environment.
+- write secure, portable applications once;
+- run them on any platform (web, server, mobile, desktop);
+- extend them with new drivers and capabilities;
+- audit and understand data flow and application behavior.
