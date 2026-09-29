@@ -1,10 +1,8 @@
 # Syntez
 
-## Declarative applications as a virtual machine
+## Declarative Applications Without Code Execution
 
-Syntez is an experimental framework for describing applications as declarative structures of values and dependencies. Applications are written in the `.syntez` language and executed by a language-agnostic virtual machine.
-
-A Syntez application declares **what values must exist and how they are determined**. The virtual machine evaluates these relationships and connects the resulting values to the surrounding environment. User code never has direct access to system APIs or environment state.
+Syntez is an experimental language for describing applications as hierarchies of values and dependencies. An application declares **what values must exist and how they are determined**. The virtual machine maintains these relationships, automatically updates values when inputs change, and mediates all external I/O through system drivers.
 
 ```syntez
 console(location:);
@@ -13,508 +11,199 @@ view(
     b(2004318207);
     c(11206655);
     
-    (b(255); Header);
-    Body;
-    (b(255); Footer)
+    (b(255); 'Header');
+    'Body';
+    (b(255); 'Footer')
 );
 ```
 
-The user does not manually subscribe to changes, trigger recalculation, update the screen, or synchronize outputs. These are runtime responsibilities.
+You describe values, not procedures. The virtual machine handles dependency tracking, recalculation, and output synchronization.
 
 ---
 
-## Architecture
+## Core Concepts
 
-### The Central Idea
+### Values, Not Commands
 
-Syntez treats an application as a declarative hierarchy of values.
-
-A value can be:
-
-- a constant;
-- a system input;
-- an object;
-- an array;
-- a function that describes a derived value.
-
-For example:
+Syntez has no executable code, control flow, or side effects. Every expression describes a value.
 
 ```syntez
-status: location:;
+status: location:
 ```
 
-The functor does not describe an action. It describes the value that must exist according to the current location.
+This says: *"status is determined by the current location"* — not *"when location changes, call a function."*
 
-If location changes, the value returned by `status` becomes different because the relationship is still valid:
+When location updates, status is automatically recalculated. You do not manage subscriptions, events, or state mutations.
 
-```text
-status = location
-```
+### Seven Types of Values
 
-The user does not need to think about event handlers or subscriptions. The function is treated as a declarative rule.
+1. **Nothing** — Absence of a value
+2. **Error** — Failures and exceptional states, treated as ordinary values
+3. **Number** — Integer or floating-point literals: `42`, `3.14`
+4. **Text** — Quoted or unquoted: `'hello'`, `identifier`
+5. **Named Value** — Key-value pair: `color(255)`, `title('Page')`
+6. **Set** — Multiple values: `a; b; c`
+7. **Formula** — Expressions combining operands with operators
 
-A useful analogy is a spreadsheet:
+### Operators
 
-```text
-B1 = A1 * 2
-```
+| Operator | Purpose | Example |
+|----------|---------|---------|
+| `+` | add / concatenate | `3 + 2`, `'hello' + 'world'` |
+| `-` | subtract / remove | `5 - 3` |
+| `*` | multiply | `4 * 2` |
+| `/` | divide / lookup | `10 / 2`, `set / 'key'` |
+| `^` | exponent | `2 ^ 8` |
+| `:` | root | `8 : 3` (cube root) |
+| `~` | type check / parse | `value ~` (get type), `text ~ 'syntez'` (parse) |
+| `&` | logical AND | `a & b` |
+| `\|` | logical OR / fallback | `a \| b` |
 
-The author of the formula does not manage the mechanism that recalculates `B1` when `A1` changes. They only describe the relationship between the values.
-
-Syntez applies the same idea to application structures.
-
----
-
-## Values, Not Procedures
-
-Syntez code is intended to describe values rather than a sequence of commands.
-
-A user functor normally:
-
-- reads values;
-- calculates a result;
-- returns a result.
-
-It does not normally:
-
-- subscribe to events;
-- trigger recalculation;
-- update the screen;
-- make network requests;
-- manage state mutations;
-- perform side effects;
-- access system resources.
-
-For example:
+Each operator has semantics defined by the types of its operands. Errors propagate and can be recovered:
 
 ```syntez
-greeting: 'Hello, ' + user:;
+result: api_call: | 'Default Value'
+display: (result ~ = error & ('Error: ' + result)) | result
 ```
 
-This describes a value derived from `user`.
+### Dependencies Discovered Automatically
 
-It does not say:
-
-```text
-when user changes, call greeting
-```
-
-It says:
-
-```text
-greeting is determined by user
-```
-
-The runtime uses this relationship to keep the application values consistent.
+When a value is computed, the VM records which system inputs it reads. If those inputs change, the value is automatically recalculated. Dependencies are discovered at runtime, not declared statically.
 
 ---
 
-## The Application is a Dependency Structure
+## System Inputs and Drivers
 
-A Syntez application can be understood as a structure like this:
+### System Inputs
 
-```text
-system input
-    ↓
-user functor
-    ↓
-derived value
-    ↓
-output driver
-```
-
-For example:
-
-```text
-keyboard state
-    ↓
-status()
-    ↓
-console
-```
-
-or:
-
-```text
-location
-    ↓
-page()
-    ↓
-view
-```
-
-The dependency is discovered when a functor reads a value during evaluation.
-
-If a later evaluation reads a different set of values, the dependency structure is updated accordingly. The user does not declare or remove subscriptions manually.
-
----
-
-## System Inputs
-
-System inputs expose values provided by the surrounding environment through the virtual machine.
-
-The current browser runtime provides:
-
-### Keyboard Input
+Certain identifiers followed by `:` provide values from the environment:
 
 ```syntez
-keys:
+keys:           ← current keyboard state
+mouse:          ← current mouse state
+location:       ← current URL
 ```
 
-Returns the current keyboard state.
+When these inputs change, all dependent values are updated.
 
-### Mouse Input
+### Output Drivers
+
+Reserved names in the root application declaration route values to outputs:
 
 ```syntez
-mouse:
+console(value)  ← output to browser console
+view(structure) ← render to the DOM
 ```
 
-Returns the current mouse-related state maintained by the browser driver.
-
-### Browser Location
+The same value can be sent to multiple drivers:
 
 ```syntez
-location:
+value: location:;
+console(value);
+view(value);
 ```
 
-Returns the current browser location.
+### Future Drivers
+
+The driver system is extensible. Planned drivers include HTTP requests, timers, file I/O, and database access. The language and syntax remain unchanged; new drivers are added as the framework matures.
+
+---
+
+## Error Handling
+
+Errors are first-class values. Drivers may return errors (network failure, missing data, etc.). Your application inspects error types and responds accordingly:
 
 ```syntez
-console(location:);
+status: http:;
+display: (/status ~ = error & 'Request failed') | ('Status: ' + /status)
 ```
 
-The value is updated when the browser location changes.
+Errors propagate through formulas by default and can be caught with the `|` (OR) operator.
 
 ---
 
-## Output Drivers
+## Security and Sandboxing
 
-Outputs are selected by properties in the application declaration.
+User code in `.syntez` files runs in a controlled environment:
 
-The current browser runtime provides:
+- No direct access to browser APIs, DOM, file system, or network
+- No global state or cross-application data access
+- All external interaction mediated through drivers
+- Code cannot escape the sandbox
 
-- `console` — outputs to browser console;
-- `view` — renders to the DOM.
-
-```syntez
-console(location:);
-view(
-    'Current location: ';
-    location:
-);
-```
-
-The same derived value can be used by several outputs.
-
-The function does not contain console-specific or view-specific logic. The surrounding declaration determines where its result is delivered.
-
-This allows the same application model to use different output drivers for different environments.
-
-Possible future drivers may connect values to:
-
-- HTTP APIs;
-- WebSockets;
-- files;
-- databases;
-- timers;
-- remote systems;
-- embedded hardware;
-- other external environments.
-
-Such drivers are not currently implemented unless explicitly provided.
-
----
-
-## Data and External Systems
-
-A driver interprets Syntez values according to the rules of its environment.
-
-For example, a database driver could interpret a Syntez structure as desired database state. The application describes the value. The database driver is responsible for deciding how to synchronize the external database with that value.
-
-This principle applies to other environments as well:
-
-```text
-Syntez value → system driver → external system
-```
-
-A driver may interpret a value as:
-
-- current state to be synchronized;
-- configuration;
-- a document;
-- a request;
-- a command;
-- a device state;
-- a remote resource.
-
-The meaning depends on the driver contract.
-
----
-
-## Values Can Represent Loading and Errors
-
-Syntez does not require loading states and application errors to be a separate control-flow mechanism.
-
-A system driver can represent them as ordinary values.
-
-For example, a request driver may return an error value representing a loading state or a connection failure. A user functor can inspect the result and choose how to represent it.
-
-The same error value can be:
-
-- displayed under an input;
-- displayed in a popup;
-- written to the console;
-- converted into a fallback value;
-- passed to another driver;
-- ignored by a particular part of the application.
-
-The application decides how an error value should appear or propagate.
-
----
-
-## External Actions and Activation
-
-Some operations should happen only after an explicit external event.
-
-For example, sending an email should not happen every time the form is recalculated. It should happen when the user activates a submit control.
-
-This kind of behavior is represented by a system input or driver for activation.
-
-Conceptually:
-
-```text
-form state
-    ↓
-submit activation
-    ↓
-submit value
-    ↓
-email driver
-```
-
-The important distinction is:
-
-- a normal value describes current state;
-- an activation value represents an external occurrence;
-- a driver decides how that occurrence is delivered;
-- the user functor describes the value produced for that occurrence.
-
-The current browser runtime does not yet provide a complete general activation API. This is part of the system-driver extension model.
-
----
-
-## Security and Isolation
-
-User code in `.syntez` files is executed in a controlled virtual machine environment.
-
-**Security guarantees:**
-
-- No direct access to browser APIs, DOM, network, or file system;
-- No access to global state or other applications' data;
-- Only sanctioned system drivers can interact with the external environment;
-- Application code cannot escape the sandbox or bypass restrictions;
-- All operations are mediated through explicit driver contracts.
-
-This makes Syntez suitable for:
-
-- untrusted user-submitted applications;
-- sandboxed multi-tenant environments;
-- embedded application scripting;
-- secure plugin systems.
-
-**Different from procedural languages:**
-
-Unlike JavaScript or other general-purpose languages, Syntez code *cannot* perform arbitrary operations. The virtual machine enforces this through its architecture, not through convention or best practices.
-
----
-
-## Language Independence
-
-The Syntez language specification is independent of any programming language.
-
-A single `.syntez` file can be executed by:
-
-- JavaScript/Browser implementation (current);
-- C++ implementation;
-- PHP implementation;
-- Python implementation;
-- Go implementation;
-- Rust implementation;
-- Or any other language with a Syntez interpreter.
-
-Each implementation:
-
-- Parses the same `.syntez` syntax;
-- Evaluates the same dependency model;
-- Implements the same system drivers;
-- Produces consistent results across platforms.
-
-This makes applications portable across environments and allows developers to choose the best runtime for their use case.
-
----
-
-## Why This Model is Useful
-
-### Local Definition of Values
-
-A derived value is described at a specific declaration site. There is no public operation for arbitrary code to update that derived value from somewhere else. Its result is determined by:
-
-- the functor that describes it;
-- the values read by that functor;
-- the system inputs used by those values.
-
-This makes the origin of a value easier to find and understand.
-
-### Fewer Hidden Mutations
-
-In an ordinary mutable application, a value may be changed from many unrelated places. This can make it difficult to determine why a value has a particular state.
-
-In Syntez, the intended model is:
-
-```text
-value = declaration(inputs)
-```
-
-A value changes because its declared inputs change or because a system driver provides a new value.
-
-### Traceable Data Flow
-
-A value can be followed through the application:
-
-```text
-system input
-    → functor
-    → derived value
-    → output driver
-```
-
-This can make it easier to:
-
-- debug the application;
-- inspect where a value came from;
-- understand why an output changed;
-- audit data flow;
-- identify which external drivers are involved.
-
-### System Complexity Belongs in Drivers
-
-Application code should not reimplement the same low-level mechanisms repeatedly.
-
-Drivers can provide reusable implementations for:
-
-- browser input;
-- network communication;
-- database access;
-- files;
-- devices;
-- authentication;
-- rendering;
-- storage;
-- remote systems.
-
-The application describes the required values. The runtime and drivers implement the system operations needed to provide or consume those values.
-
-### Security and Portability
-
-User code is sandboxed and cannot access the environment directly. Applications are language-agnostic and can run on any platform with a Syntez interpreter. This enables:
-
-- safe execution of untrusted code;
-- true portability across web, server, mobile, and desktop;
-- multi-tenant application hosting.
+This design makes Syntez suitable for untrusted user-submitted applications and multi-tenant environments.
 
 ---
 
 ## Current Implementation
 
-### Browser Runtime
+The current browser-based runtime demonstrates:
 
-The current implementation is an experimental browser runtime located in:
+- Declarative application structure
+- Automatic dependency tracking
+- System inputs: `keys:`, `mouse:`, `location:`
+- Output drivers: `console`, `view`
+- DOM rendering and CSS styling through named properties
+- Arithmetic and logical operations
 
-```text
-web/syntez.js
+Located in:
+- `web/syntez.js` — Virtual machine, parser, and drivers
+- `web/index.syntez` — Example application
+- `web/index.html` — Loader
+
+### Run It
+
+```bash
+cd web
+python3 -m http.server 8000
+# Open http://localhost:8000/
 ```
 
-The example application is located in:
-
-```text
-web/index.syntez
-```
-
-### Language Parser
-
-The `.syntez` language is parsed by the `String.prototype['~ syntez']` function in `syntez.js`. The parser converts the text representation into an abstract syntax tree and evaluates it according to the Syntez model.
-
-### Browser-Specific Features
-
-The browser runtime currently demonstrates:
-
-- declarative application initialization;
-- dependency discovery during evaluation;
-- reactive system inputs (keyboard, mouse, location);
-- derived values and recalculation;
-- console output;
-- DOM rendering and layout;
-- CSS-based styling through declarative properties.
-
-The current implementation is intentionally small and focused on validating the core model.
-
-It is not yet a complete production framework.
+(A local server is required because the VM loads applications via `fetch`.)
 
 ---
 
-## Current Limitations
+## Limitations
 
-The current project is experimental.
+This is an experimental implementation validating the core concept. Not yet implemented:
 
-The following areas are not yet mature or fully implemented:
+- Formal language grammar specification
+- Complete set of system drivers and operations per type
+- HTTP, WebSocket, timer, file, and database drivers
+- General activation API for explicit actions
+- Production-grade error diagnostics
+- Comprehensive test suite
+- Performance optimization (parallelization, memoization, dead-code elimination)
+- Implementations in languages other than JavaScript
 
-- formal `.syntez` language grammar and specification;
-- a complete set of system input drivers;
-- a complete set of output drivers;
-- HTTP, WebSocket, timer, and file drivers;
-- general request and database drivers;
-- a general activation API;
-- production-grade error reporting;
-- resource cleanup for all possible drivers;
-- comprehensive testing;
-- development tools and dependency inspection;
-- performance optimization and guarantees for large applications;
-- reference implementations in languages other than JavaScript;
-- formal driver specification and contract model.
+These are implementation limitations, not limitations of the language model.
 
-These limitations concern the current implementation, not the general direction of the model.
+---
+
+## Vision
+
+Syntez explores whether application programming can be expressed entirely as:
+
+1. Declarative hierarchies of values and dependencies
+2. A language-agnostic specification implemented by different VMs
+3. Extensible system drivers for all external operations
+
+The goal is to enable:
+
+- **Secure** — User code runs in isolation
+- **Portable** — Same `.syntez` file runs on any platform with a VM
+- **Auditable** — Data flow is explicit and traceable
+- **Simple** — No imperative code, state mutations, or side effects to reason about
 
 ---
 
 ## Design Principles
 
-- **Declarative value model** — applications are described as structures of values and dependencies, not as sequences of commands.
-- **One application declaration** — the application is described through one top-level structure.
-- **Values instead of procedures** — user code describes values and relationships rather than event-handling procedures.
-- **Automatic dependency discovery** — dependencies are discovered from the values read during evaluation.
-- **No user-managed subscriptions** — users do not manually subscribe or unsubscribe from system inputs.
-- **No user-managed recalculation** — users do not manually trigger updates of dependent values.
-- **System drivers own external operations** — input, output, I/O, communication, and environment integration belong to drivers.
-- **Errors can be values** — loading and application-level failures can be represented and processed as ordinary values.
-- **Explicit external activation** — operations that must happen after an external action should use an activation-oriented system driver.
-- **Local value definition** — a derived value is determined by its declaration and its dependencies rather than arbitrary writes from unrelated code.
-- **Isolated execution** — user code runs in a sandbox and cannot access the environment directly.
-- **Language independence** — the same `.syntez` specification can be implemented in any programming language.
-- **Minimal user vocabulary** — application authors should primarily need to understand values, functors, system inputs, output properties, and available drivers.
-
----
-
-## Status
-
-Syntez is an experimental project exploring whether application programming can be expressed primarily as:
-
-1. A declarative structure of values and dependencies;
-2. A language-agnostic virtual machine that isolates user code;
-3. System-specific behavior implemented through extensible drivers.
-
-The long-term goal is to make it possible to:
-
-- write secure, portable applications once;
-- run them on any platform (web, server, mobile, desktop);
-- extend them with new drivers and capabilities;
-- audit and understand data flow and application behavior.
+- Applications are value hierarchies, not command sequences
+- Dependencies are discovered automatically during evaluation
+- System drivers own all external operations (I/O, input, output)
+- Errors are ordinary values, not exceptions
+- User code is isolated and cannot access the environment directly
+- The same language specification can be implemented on any platform
+- Minimal vocabulary: values, operators, and driver names
+```
