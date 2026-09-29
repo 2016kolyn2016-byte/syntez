@@ -28,7 +28,7 @@ You describe values, not procedures. The virtual machine handles dependency trac
 Syntez has no executable code, control flow, or side effects. Every expression describes a value.
 
 ```syntez
-status: location:
+status(location:)
 ```
 
 This says: *"status is determined by the current location"* — not *"when location changes, call a function."*
@@ -62,8 +62,8 @@ When location updates, status is automatically recalculated. You do not manage s
 Each operator has semantics defined by the types of its operands. Errors propagate and can be recovered:
 
 ```syntez
-result: api_call: | 'Default Value'
-display: (result ~ = error & ('Error: ' + result)) | result
+result(https://host/entity/ | 'Default Value');
+display(/result ~ = error & ('Error: ' + (/result)) | (/result))
 ```
 
 ### Dependencies Discovered Automatically
@@ -114,8 +114,8 @@ The driver system is extensible. Planned drivers include HTTP requests, timers, 
 Errors are first-class values. Drivers may return errors (network failure, missing data, etc.). Your application inspects error types and responds accordingly:
 
 ```syntez
-status: http:;
-display: (/status ~ = error & 'Request failed') | ('Status: ' + /status)
+status(http:);
+display(/status ~ = error & 'Request failed' | ('Status: ' + /status))
 ```
 
 Errors propagate through formulas by default and can be caught with the `|` (OR) operator.
