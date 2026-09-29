@@ -28,7 +28,10 @@ You do not manually subscribe to changes, trigger recalculation, update the scre
 Syntez contains no executable code, control flow, or side effects. Every expression describes a value.
 
 ```syntez
-greeting: ('Hello, ' + user:);
+(
+    user(text:); "text input"
+    greeting('Hello, ' + (/user)); "default left operand is a current list with ;"
+)
 ```
 
 This describes: *"greeting is determined by user"* — not *"when user changes, call greeting."*
@@ -39,7 +42,7 @@ The VM keeps `greeting` consistent with `user`. You don't manage subscriptions, 
 
 - **Nothing** — absence of a value
 - **Error** — failures and exceptional states, treated as ordinary values
-- **Number** — `42`, `3.14`
+- **Number** — `42`
 - **Text** — `'hello'`, `identifier`
 - **Named Value** — `name(value)` creates a named entity
 - **Set** — multiple values: `a; b; c`
@@ -57,9 +60,10 @@ Eight operators. Semantics depend on operand types:
 | `/` | divide / lookup | `10 / 2`, `set / 'key'` |
 | `^` | exponent | `2 ^ 8` |
 | `:` | root / extract | `8 : 3` (cube root), `http:` (system input) |
-| `~` | type check / parse | `value ~` (get type), `text ~ 'syntez'` (parse) |
+| `~` | type check / convertion | `value ~` (get type), `text ~ 'syntez'` (parse) |
 | `&` | logical AND | `a & b` |
 | `\|` | logical OR / fallback | `a \| b` |
+| `=` | equal | `a = b` |
 
 ### Named Values
 
@@ -132,7 +136,7 @@ Errors are first-class values. System drivers may return errors (network failure
 
 ```syntez
 status: http: 'https://api.example.com/status';
-display: (/status ~ = error & ('Error: ' + /status)) | /status
+display: (/status ~ = error & ('Error: ' + (/status)) | /status)
 ```
 
 If `http:` returns an Error, display shows the error. Otherwise, it shows the status.
