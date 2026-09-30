@@ -65,6 +65,8 @@ Eight operators. Semantics depend on operand types:
 | `\|` | logical OR / fallback | `a \| b` |
 | `=` | equal | `a = b` |
 
+Operators have no precedence and are evaluated strictly from left to right.
+
 ### Named Values
 
 Syntax: `name(value)`. The name is determined by the default operator, which creates a named entity.
@@ -119,7 +121,7 @@ view(structure) ← render to the DOM
 The same value can be sent to multiple outputs:
 
 ```syntez
-data: location:;
+data(location:);
 console(data);
 view(data);
 ```
@@ -136,7 +138,7 @@ Errors are first-class values. System drivers may return errors (network failure
 
 ```syntez
 status: http: 'https://api.example.com/status';
-display: (/status ~ = error & ('Error: ' + (/status)) | /status)
+display: (/status ~ = error & ('Error: ' + (/status)) | (/status))
 ```
 
 If `http:` returns an Error, display shows the error. Otherwise, it shows the status.
@@ -245,18 +247,6 @@ Browser-based experimental runtime:
 - Output drivers: `console`, `view`
 - DOM rendering and CSS styling through named properties
 - Arithmetic and logical operations
-
-### Run It
-
-```bash
-cd web
-python3 -m http.server 8000
-# Open http://localhost:8000/
-```
-
-A local server is required because the VM loads applications via `fetch`.
-
----
 
 ## Current Limitations
 
