@@ -1,56 +1,79 @@
 # Syntez
 
-## Declarative Applications as a Virtual Machine
+## Declarative Programming Language
 
-Syntez is an experimental language for describing applications as hierarchies of values and dependencies. Applications declare **what values must exist and how they are determined**. The virtual machine maintains these relationships, automatically updates values when inputs change, and mediates all external I/O through system drivers.
+Syntez is a language for describing applications as values and their dependencies. You don't write commands for the computer — you describe what values should exist and how they relate to each other. The runtime automatically keeps everything consistent.
 
 ```syntez
-console(location:);
-view(
-    y(0);
-    b(2004318207);
-    c(11206655);
-    
-    (b(255); 'Header');
-    'Body';
-    (b(255); 'Footer')
-);
+user(text:);
+greeting: 'Hello, ' + (/user);
+view(/greeting)
 ```
 
-You do not manually subscribe to changes, trigger recalculation, update the screen, or synchronize outputs. These are runtime responsibilities.
+When `user` changes, `greeting` automatically updates. When `greeting` changes, `view` automatically re-renders. No manual state management. No event handlers. No subscriptions.
+
+---
+
+## How Is Syntez Different?
+
+| Feature | JavaScript | Syntez |
+|---|---|---|
+| What you write | Commands (imperative) | Declarations (declarative) |
+| State management | You manage manually | Automatic |
+| Dependencies | You track manually | Automatic |
+| When input changes | You must update everything downstream | Automatic cascade |
+| Sandbox | No | Yes (built-in) |
+
+Syntez is closest to **Excel formulas** (automatic recalculation) and **SQL** (declarative), but for full applications.
 
 ---
 
 ## Core Concepts
 
-### Values, Not Commands
+### Values and Formulas
 
-Syntez contains no executable code, control flow, or side effects. Every expression describes a value.
+Syntez contains no commands or control flow. Every expression describes a value.
 
 ```syntez
-(
-    user(text:); "text input"
-    greeting('Hello, ' + (/user)); "default left operand is a current list with ;"
-)
+x(5);                           // x is a value: 5
+y: /x + 3;                      // y is a formula: always x + 3
+message: 'Count: ' + (/y);      // message combines values
+view(/message)                  // view displays the message
 ```
 
-This describes: *"greeting is determined by user"* — not *"when user changes, call greeting."*
-
-The VM keeps `greeting` consistent with `user`. You don't manage subscriptions, events, or state mutations.
+The VM keeps `y` and `message` consistent with `x`. When `x` changes, everything downstream updates.
 
 ### Types of Values
 
 - **Nothing** — absence of a value
-- **Error** — failures and exceptional states, treated as ordinary values
+- **Error** — failures treated as ordinary values
 - **Number** — `42`
-- **Text** — `'hello'`, `identifier`
-- **Named Value** — `name(value)` creates a named entity
+- **Text** — `'hello'` or identifier
+- **Named Value** — `name(value)` creates a key-value pair
 - **Set** — multiple values: `a; b; c`
-- **Formula** — expressions combining operands with operators
+- **Formula** — expressions combining values with operators
 
-### Operators
+### Automatic Dependency Tracking
 
-Eight operators. Semantics depend on operand types:
+When you reference a value in a formula, the VM automatically tracks the dependency:
+
+```syntez
+status(http: 'api/status');
+message: ((status: = 'ok') & 'Ready') | 'Not Ready';
+view(/message)
+```
+
+- If `status:` equals `'ok'`, `message` reads from the first branch
+- If `status:` is different, `message` reads from the second branch
+- **Dependencies change at runtime based on the condition**
+
+When `status:` changes, `message` is automatically recalculated. No manual subscriptions.
+
+---
+
+## Operators
+
+Eight core operators. Semantics depend on operand types:
 
 | Operator | Purpose | Example |
 |----------|---------|---------|
@@ -59,39 +82,45 @@ Eight operators. Semantics depend on operand types:
 | `*` | multiply | `4 * 2` |
 | `/` | divide / lookup | `10 / 2`, `set / 'key'` |
 | `^` | exponent | `2 ^ 8` |
-| `:` | root / extract | `8 : 3` (cube root), `http:` (system input) |
-| `~` | type check / convertion | `value ~` (get type), `text ~ 'syntez'` (parse) |
-| `&` | logical AND | `a & b` |
-| `\|` | logical OR / fallback | `a \| b` |
+| `:` | extract / input | `8 : 3` (root), `http:` (system input) |
+| `~` | type check / parse | `value ~` (type), `text ~ 'syntez'` (parse) |
 | `=` | equal | `a = b` |
+| `<` | less than | `a < b` |
+| `>` | greater than | `a > b` |
 
-Operators have no precedence and are evaluated strictly from left to right.
+**Important:** Operators have no precedence and are evaluated strictly left to right.
 
-### Named Values
+Example: `3 + 2 * 4` evaluates as `(3 + 2) * 4 = 20`, not `3 + (2 * 4) = 11`
 
-Syntax: `name(value)`. The name is determined by the default operator, which creates a named entity.
+### Logical Operators: `&` and `|`
 
-```syntez
-title('Page')       ← named value: key='title', value='Page'
-color(255)          ← named value: key='color', value=255
-status(http:)       ← named value: key='status', value=result of http: formula
-```
+The `&` and `|` operators work with data, not boolean logic.
 
-Named values are used for metadata, structured output, and system driver contracts.
-
-### Automatic Dependency Discovery
-
-When a formula is evaluated, the VM observes which system inputs it reads. These become its dependencies.
+**`&` (AND) — Keep left, or use right:**
+- If left operand is **significant** (non-zero, non-empty, non-nothing), return it
+- If left operand is **not significant** (0, empty string, nothing), return right operand
 
 ```syntez
-message: ((status: = 'ok') & 'Ready') | 'Not Ready'
+quantity(0) & 'no items'        // → 'no items' (0 is not significant)
+quantity(5) & 'items'           // → 'items' (5 is significant)
+
+user(nothing) & 'guest';        // → 'guest' (nothing is not significant)
+user('Alice') & 'welcome';      // → 'welcome' (non-empty is significant)
 ```
 
-- If `status:` equals `'ok'`, the formula reads `'Ready'`
-- If `status:` is different, the formula reads `'Not Ready'`
-- **Dependencies change at runtime based on control flow**
+**`|` (OR) — Use left if significant, or right:**
+- If left operand is **significant**, return it
+- If left operand is **not significant**, return right operand
 
-When `status:` changes, `message` is automatically recalculated. No manual subscription. No event handlers.
+```syntez
+cached_value(nothing) | http: 'api/data'   // → fetches data (cache is empty)
+cached_value('data') | http: 'api/data'    // → 'data' (use cache)
+
+input(0) | 100                  // → 100 (input is 0, use default)
+input(50) | 100                 // → 50 (input is significant)
+```
+
+These operators are designed for **data flow**, not boolean tests. They're useful for fallbacks, defaults, and conditional data selection without explicit if/else.
 
 ---
 
@@ -99,85 +128,126 @@ When `status:` changes, `message` is automatically recalculated. No manual subsc
 
 ### System Inputs
 
-Identifiers followed by `:` provide values from the environment:
+Inputs are named by identifiers followed by `:`. They represent values from the environment:
 
 ```syntez
-keys:           ← keyboard state
-mouse:          ← mouse state
-location:       ← browser URL
+keys:       // keyboard input
+mouse:      // mouse state
+location:   // browser URL
 ```
 
-When inputs change, all dependent values are updated.
+Formulas automatically depend on these inputs. When they change, dependent values recalculate:
+
+```syntez
+url_param: /location / 'id';
+data: http: 'api/user/' + /url_param;
+view(/data)
+```
+
+When `location:` changes, the URL param is extracted, data is re-fetched, and the view updates — all automatically.
 
 ### Output Drivers
 
-Reserved names in the root application declaration route values to outputs:
+Output is done through reserved names that route values to the system:
 
 ```syntez
-console(value)  ← output to browser console
-view(structure) ← render to the DOM
+view(value)     // render to DOM
+console(value)  // log to browser console
 ```
 
 The same value can be sent to multiple outputs:
 
 ```syntez
-data(location:);
-console(data);
-view(data);
+result(http: 'api/compute');
+console(/result);
+view(/result)
 ```
 
-### Future Drivers
-
-The driver system is extensible. Planned: HTTP requests, timers, file I/O, database access. Syntax unchanged; drivers added as framework matures.
+Future drivers (planned): HTTP requests, timers, file I/O, database access.
 
 ---
 
 ## Error Handling
 
-Errors are first-class values. System drivers may return errors (network failure, missing data, etc.). Your application inspects error types and responds:
+Errors are first-class values. System drivers may return errors (network failure, missing data, etc.). Inspect and respond:
 
 ```syntez
 status: http: 'https://api.example.com/status';
-display: (/status ~ = error & ('Error: ' + (/status)) | (/status))
+display: (/status ~ = error) & ('Error: ' + (/status)) | (/status)
 ```
 
-If `http:` returns an Error, display shows the error. Otherwise, it shows the status.
+If `http:` returns an Error, display shows it. Otherwise, it shows the value.
 
 Errors propagate through formulas by default:
 
 - `Error + 5` → Error
-- `Error & true` → Error
-- `Error | 'fallback'` → `'fallback'` (OR operator recovers)
+- `Error & 'fallback'` → `'fallback'` (AND recovers from error)
+- `Error | 'fallback'` → `'fallback'` (OR recovers from error)
 
 This eliminates try/catch boilerplate.
 
 ---
 
-## The Application is a Dependency Structure
+## How It Works
 
-A Syntez application flow:
+An application is a graph of values and their relationships:
 
-```text
-system input
-    ↓
-formula (combining inputs and constants)
-    ↓
-derived value
-    ↓
-output driver
-```
+1. System inputs (e.g., `keys:`, `location:`) change
+2. Formulas depending on them are recalculated
+3. Dependent values cascade update automatically
+4. Output drivers (view, console) display the results
 
 Example:
 
-```text
-location:
-    ↓
-view(location:)
-    ↓
-DOM update
+```syntez
+item_count(0);
+items: array_from(http: 'api/items');
+count: /items | nothing;
+message: /count & ('Items: ' + /count) | 'No items';
+view(/message)
 ```
 
-Dependencies are discovered during evaluation. If a formula's condition changes, its dependencies change too. The user never declares or removes subscriptions manually.
+When you change `item_count(5)`, the entire chain updates automatically. No refresh needed.
+
+---
+
+## Common Patterns
+
+### Conditional Display
+
+```syntez
+status(http: 'api/status');
+display: (/status = 'ok') & 'Ready' | 'Loading...';
+view(/display)
+```
+
+### Form with Validation
+
+```syntez
+email(text:);
+is_valid: /email ~ 'email';
+error: (/is_valid ~ = error) & /is_valid | nothing;
+view(/error)
+```
+
+### Dependent Calculations
+
+```syntez
+quantity(5);
+price(100);
+total: /quantity * /price;
+discount: /total > 500 & /total * 0.1 | 0;
+final_price: /total - /discount;
+view(/final_price)
+```
+
+### Fallback / Default Values
+
+```syntez
+user_preference(nothing);
+theme: /user_preference | 'light';  // use preference, or default to 'light'
+view(/theme)
+```
 
 ---
 
@@ -205,7 +275,7 @@ All external interaction goes through system drivers. An application declares ne
 
 ---
 
-## Why This Model is Useful
+## Why This Model Is Useful
 
 **Local Value Definition**
 
@@ -218,7 +288,7 @@ Values change because inputs change or drivers provide new data, not because of 
 **Traceable Data Flow**
 
 ```text
-system input → formula → value → output driver
+system input → formula → derived value → output driver
 ```
 
 **System Complexity in Drivers**
@@ -227,7 +297,7 @@ Application code describes required values. Drivers implement network, database,
 
 **Portable Applications**
 
-The same `.syntez` file can run on any platform with a Syntez VM.
+The same `.syntez` file runs on any platform with a Syntez VM.
 
 ---
 
@@ -246,33 +316,48 @@ Browser-based experimental runtime:
 - System inputs: `keys:`, `mouse:`, `location:`
 - Output drivers: `console`, `view`
 - DOM rendering and CSS styling through named properties
-- Arithmetic and logical operations
+- Arithmetic, comparison, and logical operations
 
-## Current Limitations
+### Limitations
 
-Syntez is an experimental implementation. The following areas are not yet complete:
+Syntez is experimental. Incomplete areas:
 
 - Formal language grammar specification
-- Complete operator semantics for every type
+- Complete operator semantics for all types
 - HTTP, WebSocket, timer, file, and database drivers
 - Activation API for explicit user actions
 - Production-grade error diagnostics
 - Comprehensive test suite
 - Performance optimization
-- Implementations in languages other than JavaScript
+- Implementations in other languages
 
-Other VM implementations are planned after the core concept has been validated.
+Other VM implementations are planned after the core concept is validated.
+
+---
+
+## Who Should Use Syntez?
+
+**Good fit:**
+- Building user interfaces and dashboards
+- Applications with complex dependencies
+- Learning declarative programming
+- Safe execution of untrusted code
+
+**Not suitable for:**
+- System programming (OS, drivers, embedded systems)
+- Performance-critical algorithms
+- Code that requires direct hardware access
 
 ---
 
 ## Design Principles
 
 - Declarative value hierarchies, not command sequences
-- Dependencies discovered automatically during evaluation
+- Dependencies discovered and tracked automatically
 - System drivers own external operations
 - Errors are ordinary values
 - User code is isolated from the environment
-- The language specification is independent of the VM implementation
+- Language specification is independent of VM implementation
 - Minimal vocabulary: values, operators, and driver names
 
 ---
@@ -286,3 +371,4 @@ Syntez explores whether application programming can be expressed through:
 3. Extensible system drivers for external operations
 
 The goals are secure execution, portable applications, traceable data flow, and less infrastructure code in application logic.
+```
