@@ -14,20 +14,6 @@ When `user` changes, `greeting` automatically updates. When `greeting` changes, 
 
 ---
 
-## How Is Syntez Different?
-
-| Feature | JavaScript | Syntez |
-|---|---|---|
-| What you write | Commands (imperative) | Declarations (declarative) |
-| State management | You manage manually | Automatic |
-| Dependencies | You track manually | Automatic |
-| When input changes | You must update everything downstream | Automatic cascade |
-| Sandbox | No | Yes (built-in) |
-
-Syntez is closest to **Excel formulas** (automatic recalculation) and **SQL** (declarative), but for full applications.
-
----
-
 ## Core Concepts
 
 ### Values and Formulas
@@ -332,21 +318,6 @@ Syntez is experimental. Incomplete areas:
 - Implementations in other languages
 
 Other VM implementations are planned after the core concept is validated.
-
----
-
-## Who Should Use Syntez?
-
-**Good fit:**
-- Building user interfaces and dashboards
-- Applications with complex dependencies
-- Learning declarative programming
-- Safe execution of untrusted code
-
-**Not suitable for:**
-- System programming (OS, drivers, embedded systems)
-- Performance-critical algorithms
-- Code that requires direct hardware access
 
 ---
 
