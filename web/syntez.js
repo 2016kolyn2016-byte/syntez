@@ -1,7 +1,7 @@
 function Ctx(val) { this.par = null; this.val = val }
 function Keyd(key, val) { this.key = key; this.val = val }
 
-var OPERATORS = ['~', '+', '-', '*', '/', '%', '^', '#', ':', '.', '~', '&', '|', '<', '=', '>', ''];
+var OPERATORS = ['~', '+', '-', '*', '/', '%', '^', '#', ':', '.', '&', '|', '<', '=', '>', ''];
 OPERATORS.forEach(function(o) {
 	Number.prototype[o] = String.prototype[o] = Array.prototype[o] = Ctx.prototype[o] = function(y) {
 		var m = o + (y instanceof Ctx ? 'Ctx' : y instanceof Array ? 'Array' : y instanceof Function ? 'Function' : typeof y === 'string' ? 'String' : typeof y === 'number' ? 'Number' : y instanceof Error ? 'Error' : y instanceof Keyd ? 'Keyd' : 'Null');
