@@ -4,10 +4,49 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Syntez</title>
+	<link rel="icon" type="image/svg+xml" href="favicon.svg">
 	<link rel="stylesheet" href="index.css">
 	<script src="syntez.js"></script>
 </head>
 <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
+	<!--Using Syntez with JS--><!--script>
+		var code = Syn.http('//localhost/index.syntez');
+		console.dir(Syn);
+		Syn(()=>{console.clear();console.log({
+			code: code(),
+			location: Syn.location(),
+			pointerX: Syn.pointerX(),
+			pointerY: Syn.pointerY(),
+			width: Syn.width(),
+			height: Syn.height(),
+			scrollX: Syn.scrollX(),
+			scrollY: Syn.scrollY(),
+			focused: Syn.focused(),
+			online: Syn.online(),
+			visible: Syn.visible(),
+			pointerDown: Syn.pointerDown(),
+			target: Syn.target(),
+			key: Syn.key(),
+			keyCode: Syn.keyCode(),
+			hash: Syn.hash(),
+			pathname: Syn.pathname()
+		})});
+		document.body.innerHTML = '<div><a href="#">Syn.Tez</a></div>'
+	</script-->
+
+	<!--Using Syntez language--><!--script src="client.js"></script>
+	<script src="index.js"></script>
+	<script>
+		var app = window.app = ('(' + location.origin + '/index.syntez)~syntez')['~']('syntez');
+		Syn(function() {
+			console['='](app['/']('console'))
+		});
+		window.onload = function() {
+			Syn(function() {
+				document.body.innerHTML = '<div></div>';
+				document.body.firstChild['='](app['/']('view'))
+			})
+		}
+	</script-->
 </body>
 </html>
